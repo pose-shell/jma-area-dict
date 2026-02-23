@@ -119,7 +119,14 @@ window.JMA_DICT = (() => {
       div.className = "item";
       div.innerHTML = `<div><code>${it.code}</code> ${escapeHtml(it.name)}</div>
         <small>${escapeHtml(it.group)}</small>`;
-      div.onclick = () => onPick(it);
+      div.onclick = () => {
+      try {
+        onPick(it);
+      } catch (e) {
+        alert("クリック処理でエラー: " + (e?.message || e));
+        console.error(e);
+        }
+      };
       listEl.appendChild(div);
     }
   }
