@@ -27,22 +27,27 @@ window.JMA_DICT = (() => {
   }
 
   function flattenArea(areaJson) {
-    // areaJson の各カテゴリ（centers/offices/classXXs...）を全部フラット化
-    const out = [];
-    for (const [groupName, group] of Object.entries(areaJson)) {
-      if (!group || typeof group !== "object") continue;
-      for (const [code, node] of Object.entries(group)) {
-        if (!node || typeof node !== "object") continue;
-        out.push({
-          code,
-          name: node.name || "",
-          group: groupName,
-          raw: node,
-        });
-      }
+  const items = [];
+  const byCode = {}; // code -> { code, name, group, raw }
+
+  for (const [groupName, group] of Object.entries(areaJson)) {
+    if (!group || typeof group !== "object") continue;
+
+    for (const [code, node] of Object.entries(group)) {
+      if (!node || typeof node !== "object") continue;
+
+      const item = {
+        code,
+        name: node.name || "",
+        group: groupName,
+        raw: node,
+      };
+      items.push(item);
+      byCode[code] = item;
     }
-    return out;
   }
+  return { items, byCode };
+}
 
   function renderList(listEl, items, onPick) {
     listEl.innerHTML = "";
