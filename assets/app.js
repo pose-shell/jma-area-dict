@@ -92,19 +92,37 @@ window.JMA_DICT = (() => {
     }
   }
 
-  function renderDetail(detailEl, it) {
-    const raw = it.raw || {};
-    const parent = raw.parent || raw.parentCode || "";
-    const children = raw.children || raw.child || raw.childCode || [];
-    detailEl.innerHTML = `
-      <h2><code>${it.code}</code> ${escapeHtml(it.name)}</h2>
-      <p><small>group: ${escapeHtml(it.group)}</small></p>
-      <p>parent: ${parent ? `<code>${escapeHtml(String(parent))}</code>` : "-"}</p>
-      <p>children: ${Array.isArray(children) && children.length ? children.map(c => `<code>${escapeHtml(String(c))}</code>`).join(" ") : "-"}</p>
-      <h3>raw</h3>
-      <pre>${escapeHtml(JSON.stringify(raw, null, 2))}</pre>
-    `;
-  }
+  function renderDetail(detailEl, it, byCode) {
+  const raw = it.raw || {};
+  const parent = getParentCode(raw);
+
+  // office解決
+  const r = resolveOfficeCode(it.code, byCode);
+  const office = r.office;
+  const forecastUrl = office ? `https://www.jma.go.jp/bosai/forecast/data/forecast/${office}.json` : "";
+  const overviewUrl = office ? `https://www.jma.go.jp/bosai/forecast/data/overview_forecast/${office}.json` : "";
+
+  detailEl.innerHTML = `
+    <h2><code>${it.code}</code> ${escapeHtml(it.name)}</h2>
+    <p><small>group: ${escapeHtml(it.group)}</small></p>
+
+    <h3>office解決（予報取得用）</h3>
+    <p>office: ${office ? `<code>${escapeHtml(office)}</code>` : "<span>未解決</span>"}</p>
+    ${office ? `
+      <p>forecast: <code>${escapeHtml(forecastUrl)}</code></p>
+      <p>overview: <code>${escapeHtml(overviewUrl)}</code></p>
+    ` : `
+      <p><small>親を辿ってofficesに到達できませんでした（reason: ${escapeHtml(r.reason)}）</small></p>
+    `}
+    <p><small>探索経路: ${r.path.map(c => `<code>${escapeHtml(c)}</code>`).join(" ")}</small></p>
+
+    <h3>階層</h3>
+    <p>parent: ${parent ? `<code>${escapeHtml(String(parent))}</code>` : "-"}</p>
+
+    <h3>raw</h3>
+    <pre>${escapeHtml(JSON.stringify(raw, null, 2))}</pre>
+  `;
+}
 
   function escapeHtml(s) {
     return String(s)
@@ -125,7 +143,9 @@ window.JMA_DICT = (() => {
     let items;
     try {
       const areaJson = await loadAreaJson();
-      items = flattenArea(areaJson);
+      const flat = flattenArea(areaJson);
+      items = flat.items;
+      const byCode = flat.byCode;
     } catch (e) {
       listEl.innerHTML = `<p>area.json の取得に失敗しました。</p><pre>${escapeHtml(e.message || e)}</pre>`;
       return;
@@ -141,7 +161,7 @@ window.JMA_DICT = (() => {
         )
         .slice(0, 50);
 
-      renderList(listEl, filtered, it => renderDetail(detailEl, it));
+      renderList(listEl, filtered, it => renderDetail(detailEl, it, byCode));
     }
 
     qEl.addEventListener("input", apply);
