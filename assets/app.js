@@ -49,7 +49,7 @@ window.JMA_DICT = (() => {
     return { items, byCode };
   }
 
-  // childCode -> parentCode を逆引きで作る（親→children しか無いケースに対応）
+  // childCode -> parentCode（親→children しか無い場合の逆引き）
   function buildParentMap(areaJson) {
     const parentMap = {}; // childCode -> parentCode
 
@@ -119,48 +119,62 @@ window.JMA_DICT = (() => {
       div.className = "item";
       div.innerHTML = `<div><code>${it.code}</code> ${escapeHtml(it.name)}</div>
         <small>${escapeHtml(it.group)}</small>`;
+
+      // ★安全化パッチ：クリック時の例外を見える化
       div.onclick = () => {
-      try {
-        onPick(it);
-      } catch (e) {
-        alert("クリック処理でエラー: " + (e?.message || e));
-        console.error(e);
+        try {
+          onPick(it);
+        } catch (e) {
+          console.error(e);
+          alert("クリック処理でエラー: " + (e?.message || e));
         }
       };
+
       listEl.appendChild(div);
     }
   }
 
+  // ★安全化パッチ：renderDetail 全体を try/catch にして detail ペインにエラーを出す
   function renderDetail(detailEl, it, byCode, parentMap) {
-    const raw = it.raw || {};
-    const parent = getParentCode(raw, it.code, parentMap);
+    try {
+      // ★安全化パッチ：クリックが生きているかを即確認できる
+      detailEl.innerHTML = `<p>選択中: <code>${escapeHtml(it.code)}</code> ${escapeHtml(it.name)}</p>`;
 
-    // office解決
-    const r = resolveOfficeCode(it.code, byCode, parentMap);
-    const office = r.office;
-    const forecastUrl = office ? `https://www.jma.go.jp/bosai/forecast/data/forecast/${office}.json` : "";
-    const overviewUrl = office ? `https://www.jma.go.jp/bosai/forecast/data/overview_forecast/${office}.json` : "";
+      const raw = it.raw || {};
+      const parent = getParentCode(raw, it.code, parentMap);
 
-    detailEl.innerHTML = `
-      <h2><code>${it.code}</code> ${escapeHtml(it.name)}</h2>
-      <p><small>group: ${escapeHtml(it.group)}</small></p>
+      const r = resolveOfficeCode(it.code, byCode, parentMap);
+      const office = r.office;
+      const forecastUrl = office ? `https://www.jma.go.jp/bosai/forecast/data/forecast/${office}.json` : "";
+      const overviewUrl = office ? `https://www.jma.go.jp/bosai/forecast/data/overview_forecast/${office}.json` : "";
 
-      <h3>office解決（予報取得用）</h3>
-      <p>office: ${office ? `<code>${escapeHtml(office)}</code>` : "<span>未解決</span>"}</p>
-      ${office ? `
-        <p>forecast: <code>${escapeHtml(forecastUrl)}</code></p>
-        <p>overview: <code>${escapeHtml(overviewUrl)}</code></p>
-      ` : `
-        <p><small>親を辿ってofficesに到達できませんでした（reason: ${escapeHtml(r.reason)}）</small></p>
-      `}
-      <p><small>探索経路: ${r.path.map(c => `<code>${escapeHtml(c)}</code>`).join(" ")}</small></p>
+      detailEl.innerHTML = `
+        <h2><code>${it.code}</code> ${escapeHtml(it.name)}</h2>
+        <p><small>group: ${escapeHtml(it.group)}</small></p>
 
-      <h3>階層</h3>
-      <p>parent: ${parent ? `<code>${escapeHtml(String(parent))}</code>` : "-"}</p>
+        <h3>office解決（予報取得用）</h3>
+        <p>office: ${office ? `<code>${escapeHtml(office)}</code>` : "<span>未解決</span>"}</p>
+        ${office ? `
+          <p>forecast: <code>${escapeHtml(forecastUrl)}</code></p>
+          <p>overview: <code>${escapeHtml(overviewUrl)}</code></p>
+        ` : `
+          <p><small>親を辿ってofficesに到達できませんでした（reason: ${escapeHtml(r.reason)}）</small></p>
+        `}
+        <p><small>探索経路: ${r.path.map(c => `<code>${escapeHtml(c)}</code>`).join(" ")}</small></p>
 
-      <h3>raw</h3>
-      <pre>${escapeHtml(JSON.stringify(raw, null, 2))}</pre>
-    `;
+        <h3>階層</h3>
+        <p>parent: ${parent ? `<code>${escapeHtml(String(parent))}</code>` : "-"}</p>
+
+        <h3>raw</h3>
+        <pre>${escapeHtml(JSON.stringify(raw, null, 2))}</pre>
+      `;
+    } catch (e) {
+      console.error(e);
+      detailEl.innerHTML = `
+        <h3>detail表示でエラー</h3>
+        <pre>${escapeHtml(e?.stack || e?.message || String(e))}</pre>
+      `;
+    }
   }
 
   function escapeHtml(s) {
@@ -190,7 +204,7 @@ window.JMA_DICT = (() => {
       byCode = flat.byCode;
       parentMap = buildParentMap(areaJson);
     } catch (e) {
-      listEl.innerHTML = `<p>area.json の取得に失敗しました。</p><pre>${escapeHtml(e.message || e)}</pre>`;
+      listEl.innerHTML = `<p>area.json の取得に失敗しました。</p><pre>${escapeHtml(e?.stack || e?.message || String(e))}</pre>`;
       return;
     }
 
