@@ -48,7 +48,34 @@ window.JMA_DICT = (() => {
   }
   return { items, byCode };
 }
+  
+  function getParentCode(raw) {
+  if (!raw || typeof raw !== "object") return "";
+  return raw.parent || raw.parentCode || "";
+}
+  function resolveOfficeCode(startCode, byCode) {
+  let cur = String(startCode || "");
+  const visited = new Set();
 
+  while (cur) {
+    if (visited.has(cur)) return { office: "", path: [], reason: "loop" };
+    visited.add(cur);
+
+    const it = byCode[cur];
+    if (!it) return { office: "", path: Array.from(visited), reason: "not_found" };
+
+    if (it.group === "offices") {
+      return { office: it.code, path: Array.from(visited), reason: "ok" };
+    }
+
+    const parent = getParentCode(it.raw);
+    if (!parent) return { office: "", path: Array.from(visited), reason: "no_parent" };
+    cur = String(parent);
+  }
+
+  return { office: "", path: Array.from(visited), reason: "unknown" };
+}
+  
   function renderList(listEl, items, onPick) {
     listEl.innerHTML = "";
     if (!items.length) {
