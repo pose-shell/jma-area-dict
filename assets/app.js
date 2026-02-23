@@ -92,12 +92,37 @@ window.JMA_DICT = (() => {
     }
   }
 
-  function renderDetail(detailEl, it, byCode) {
+  function renderDetail(detailEl, it, byCode, parentMap) {
   const raw = it.raw || {};
-  const parent = getParentCode(raw);
+  const parent = getParentCode(raw, it.code, parentMap);
 
+  function resolveOfficeCode(startCode, byCode, parentMap) {
+  let cur = String(startCode || "");
+  const path = [];
+  const visited = new Set();
+
+  while (cur) {
+    if (visited.has(cur)) return { office: "", path, reason: "loop" };
+    visited.add(cur);
+    path.push(cur);
+
+    const it = byCode[cur];
+    if (!it) return { office: "", path, reason: "not_found" };
+
+    if (it.group === "offices") {
+      return { office: it.code, path, reason: "ok" };
+    }
+
+    const parent = getParentCode(it.raw, it.code, parentMap);
+    if (!parent) return { office: "", path, reason: "no_parent" };
+
+    cur = parent;
+  }
+
+  return { office: "", path, reason: "unknown" };
+}
   // office解決
-  const r = resolveOfficeCode(it.code, byCode);
+  const r = resolveOfficeCode(it.code, byCode, parentMap);
   const office = r.office;
   const forecastUrl = office ? `https://www.jma.go.jp/bosai/forecast/data/forecast/${office}.json` : "";
   const overviewUrl = office ? `https://www.jma.go.jp/bosai/forecast/data/overview_forecast/${office}.json` : "";
@@ -139,13 +164,15 @@ window.JMA_DICT = (() => {
     const detailEl = document.getElementById("detail");
 
     listEl.innerHTML = "<p>読み込み中…</p>";
-
+    let byCode;
+    let parentMap; 
     let items;
     try {
       const areaJson = await loadAreaJson();
       const flat = flattenArea(areaJson);
       items = flat.items;
-      const byCode = flat.byCode;
+      byCode = flat.byCode;
+      parentMap = buildParentMap(areaJson); 
     } catch (e) {
       listEl.innerHTML = `<p>area.json の取得に失敗しました。</p><pre>${escapeHtml(e.message || e)}</pre>`;
       return;
