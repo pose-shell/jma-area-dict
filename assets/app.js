@@ -226,5 +226,254 @@ window.JMA_DICT = (() => {
     apply();
   }
 
-  return { initCodesPage };
+async function loadForecastJson(office) {
+  const url = `https://www.jma.go.jp/bosai/forecast/data/forecast/${office}.json`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`forecast HTTP ${res.status}`);
+  return { url, json: await res.json() };
+}
+async function loadOverviewJson(office) {
+  const url = `https://www.jma.go.jp/bosai/forecast/data/overview_forecast/${office}.json`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`overview HTTP ${res.status}`);
+  return { url, json: await res.json() };
+}
+
+// JSON Pointer（RFC6901）ユーティリティ
+function escapePtrToken(s) {
+  return String(s).replaceAll("~", "~0").replaceAll("/", "~1");
+}
+function unescapePtrToken(s) {
+  return String(s).replaceAll("~1", "/").replaceAll("~0", "~");
+}
+function getByPointer(obj, ptr) {
+  if (!ptr || ptr === "/") return obj;
+  if (!ptr.startsWith("/")) throw new Error("pointer must start with /");
+  const parts = ptr.split("/").slice(1).map(unescapePtrToken);
+  let cur = obj;
+  for (const p of parts) {
+    if (cur === null || cur === undefined) return undefined;
+    cur = cur[p];
+  }
+  return cur;
+}
+
+function buildTreeDom(value, basePtr, onPick) {
+  const wrap = document.createElement("div");
+
+  function nodeLabel(k, v) {
+    const t = Array.isArray(v) ? "array" : (v && typeof v === "object" ? "object" : typeof v);
+    if (t === "object") return `${k}: {}`;
+    if (t === "array") return `${k}: [] (${v.length})`;
+    if (t === "string") return `${k}: "${v}"`;
+    return `${k}: ${String(v)}`;
+  }
+
+  function build(v, ptr, keyLabel) {
+    const isObj = v && typeof v === "object";
+    const isArr = Array.isArray(v);
+
+    const row = document.createElement("div");
+    row.style.padding = "6px";
+    row.style.borderRadius = "6px";
+    row.style.cursor = "pointer";
+
+    row.dataset.ptr = ptr;
+    row.textContent = nodeLabel(keyLabel, v);
+
+    row.onclick = (e) => {
+      e.stopPropagation();
+      onPick(ptr, v);
+    };
+
+    const childrenWrap = document.createElement("div");
+    childrenWrap.style.marginLeft = "14px";
+    childrenWrap.style.display = "none";
+
+    if (isObj) {
+      const keys = isArr ? v.map((_, i) => String(i)) : Object.keys(v);
+      for (const k of keys) {
+        const child = isArr ? v[Number(k)] : v[k];
+        const childPtr = ptr + "/" + escapePtrToken(k);
+        const childRow = build(child, childPtr, k);
+        childrenWrap.appendChild(childRow);
+      }
+
+      // 展開トグル（ダブルクリックで開閉）
+      row.ondblclick = (e) => {
+        e.stopPropagation();
+        childrenWrap.style.display = childrenWrap.style.display === "none" ? "block" : "none";
+      };
+    }
+
+    const container = document.createElement("div");
+    container.appendChild(row);
+    if (isObj) container.appendChild(childrenWrap);
+    return container;
+  }
+
+  wrap.appendChild(build(value, basePtr, "(root)"));
+  return wrap;
+}
+
+function highlightPtr(treeEl, ptr) {
+  // 全行の強調をリセット
+  treeEl.querySelectorAll("[data-ptr]").forEach(el => {
+    el.style.background = "";
+    el.style.outline = "";
+  });
+
+  const target = treeEl.querySelector(`[data-ptr="${CSS.escape(ptr)}"]`);
+  if (!target) return false;
+
+  // 祖先の childrenWrap を展開（簡易：上に辿って前の兄弟が childrenWrap なら開ける、を繰り返す）
+  let cur = target;
+  while (cur && cur !== treeEl) {
+    const parent = cur.parentElement;
+    if (!parent) break;
+    // container = row + childrenWrap の構造なので、親が childrenWrap なら表示blockにする
+    if (parent.style && parent.style.marginLeft === "14px") {
+      parent.style.display = "block";
+    }
+    cur = parent;
+  }
+
+  target.style.background = "#fff6cc";
+  target.style.outline = "1px solid #e0c24f";
+  target.scrollIntoView({ block: "center" });
+  return true;
+}
+
+async function initPlaygroundPage() {
+  const codeEl = document.getElementById("code");
+  const goEl = document.getElementById("go");
+  const ptrEl = document.getElementById("ptr");
+  const jumpEl = document.getElementById("jump");
+  const copyPtrEl = document.getElementById("copyPtr");
+  const treeEl = document.getElementById("tree");
+  const rawEl = document.getElementById("raw");
+
+  let state = {
+    office: "",
+    forecast: null, // {url, json}
+    overview: null, // {url, json}
+    active: "forecast", // forecast | overview
+  };
+
+  // クエリから初期値（?code=2920900 のように渡せるように）
+  const params = new URLSearchParams(location.search);
+  const qcode = params.get("code");
+  if (qcode) codeEl.value = qcode;
+
+  async function resolveOfficeFromAnyCode(inputCode) {
+    // 6桁なら office とみなす（最小ルール）
+    if (/^\d{6}$/.test(inputCode)) return inputCode;
+
+    // それ以外は area.json から辿る
+    const areaJson = await loadAreaJson();
+    const { byCode } = flattenArea(areaJson);
+    const parentMap = buildParentMap(areaJson);
+
+    const r = resolveOfficeCode(inputCode, byCode, parentMap);
+    if (!r.office) throw new Error(`office未解決（reason: ${r.reason}）`);
+    return r.office;
+  }
+
+  async function fetchAll() {
+    const input = (codeEl.value || "").trim();
+    if (!input) return;
+
+    treeEl.innerHTML = "<p>取得中…</p>";
+    rawEl.innerHTML = "<p>取得中…</p>";
+
+    try {
+      const office = await resolveOfficeFromAnyCode(input);
+      state.office = office;
+
+      const [forecast, overview] = await Promise.all([
+        loadForecastJson(office),
+        loadOverviewJson(office),
+      ]);
+      state.forecast = forecast;
+      state.overview = overview;
+      state.active = "forecast";
+
+      // ツリー（forecastを表示）
+      renderActive();
+    } catch (e) {
+      const msg = e?.stack || e?.message || String(e);
+      treeEl.innerHTML = `<p>エラー</p><pre>${escapeHtml(msg)}</pre>`;
+      rawEl.innerHTML = `<p>エラー</p><pre>${escapeHtml(msg)}</pre>`;
+    }
+  }
+
+  function renderActive() {
+    const data = state.active === "forecast" ? state.forecast : state.overview;
+    if (!data) return;
+
+    // ツリー
+    treeEl.innerHTML = "";
+    const dom = buildTreeDom(data.json, "", (ptr, v) => {
+      ptrEl.value = ptr || "/";
+      rawEl.innerHTML = `
+        <h3>${escapeHtml(state.active)} JSON</h3>
+        <p><small>office: <code>${escapeHtml(state.office)}</code></small></p>
+        <p><small>url: <code>${escapeHtml(data.url)}</code></small></p>
+        <h4>Selected</h4>
+        <pre>${escapeHtml(JSON.stringify(v, null, 2))}</pre>
+      `;
+      highlightPtr(treeEl, ptr);
+    });
+    treeEl.appendChild(dom);
+
+    // 右ペイン：全体JSON（大きいので最初はメタ＋ルートだけ）
+    rawEl.innerHTML = `
+      <h3>${escapeHtml(state.active)} JSON</h3>
+      <p><small>office: <code>${escapeHtml(state.office)}</code></small></p>
+      <p><small>url: <code>${escapeHtml(data.url)}</code></small></p>
+      <p><small>ツリーをクリックすると、その部分（Selected）を表示します。</small></p>
+    `;
+  }
+
+  goEl.onclick = fetchAll;
+
+  jumpEl.onclick = () => {
+    const ptr = (ptrEl.value || "").trim();
+    const data = state.active === "forecast" ? state.forecast : state.overview;
+    if (!data) return;
+
+    try {
+      const v = getByPointer(data.json, ptr === "/" ? "" : ptr);
+      if (v === undefined) throw new Error("pointerの指す値が見つかりません");
+      highlightPtr(treeEl, ptr === "/" ? "" : ptr);
+      rawEl.innerHTML = `
+        <h3>${escapeHtml(state.active)} JSON</h3>
+        <p><small>office: <code>${escapeHtml(state.office)}</code></small></p>
+        <p><small>url: <code>${escapeHtml(data.url)}</code></small></p>
+        <h4>Selected</h4>
+        <pre>${escapeHtml(JSON.stringify(v, null, 2))}</pre>
+      `;
+    } catch (e) {
+      alert("ハイライト失敗: " + (e?.message || e));
+    }
+  };
+
+  copyPtrEl.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(ptrEl.value || "");
+    } catch (e) {
+      alert("コピーに失敗しました（ブラウザ権限の問題の可能性）");
+    }
+  };
+
+  // 初期取得（クエリ指定があれば）
+  if (codeEl.value.trim()) fetchAll();
+
+  // active切替（最小：キーボード f/o で切替）
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "f") { state.active = "forecast"; renderActive(); }
+    if (e.key === "o") { state.active = "overview"; renderActive(); }
+  });
+}
+  return { initCodesPage, initPlaygroundPage };
 })();
