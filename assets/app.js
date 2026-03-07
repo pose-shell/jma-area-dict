@@ -157,6 +157,8 @@ window.JMA_DICT = (() => {
         ${office ? `
           <p>forecast: <code>${escapeHtml(forecastUrl)}</code></p>
           <p>overview: <code>${escapeHtml(overviewUrl)}</code></p>
+          <p><a href="./playground.html?code=${encodeURIComponent(office)}">Playgroundで開く（office）</a></p>
+          <p><a href="./playground.html?code=${encodeURIComponent(it.code)}">Playgroundで開く（このコード）</a></p>
         ` : `
           <p><small>親を辿ってofficesに到達できませんでした（reason: ${escapeHtml(r.reason)}）</small></p>
         `}
