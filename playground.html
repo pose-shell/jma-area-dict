@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Playground | JMA Area Dict</title>
+  <link rel="stylesheet" href="./assets/style.css" />
+</head>
+<body>
+  <header>
+    <strong>JMA Area Dict</strong>
+    <a href="./index.html">Home</a>
+    <a href="./codes.html">Codes</a>
+    <a href="./playground.html">Playground</a>
+    <a href="./notes.html">Notes</a>
+  </header>
+
+  <h1>Playground（forecast / overview）</h1>
+  <p><small>出典：気象庁ホームページ（forecast / overview_forecast）</small></p>
+
+  <div style="display:flex; gap:12px; align-items:center; margin: 12px 0;">
+    <input id="code" placeholder="市町村コード or officeコード（例：2920900 / 290000）" />
+    <button id="go">取得</button>
+  </div>
+
+  <div style="display:flex; gap:12px; flex-wrap: wrap; margin-bottom: 12px;">
+    <input id="ptr" placeholder="JSON Pointer（例：/0/timeSeries/0/areas/0）" style="flex: 1 1 420px;" />
+    <button id="jump">ハイライト</button>
+    <button id="copyPtr">pointerをコピー</button>
+  </div>
+
+  <main style="grid-template-columns: 1fr 1fr;">
+    <div class="list" id="tree"></div>
+    <div class="detail" id="raw">
+      <p>左にツリー、右にJSONを表示します。</p>
+    </div>
+  </main>
+
+  <script src="./assets/app.js"></script>
+  <script>
+    window.JMA_DICT.initPlaygroundPage();
+  </script>
+</body>
+</html>
