@@ -477,5 +477,75 @@ async function initPlaygroundPage() {
     if (e.key === "o") { state.active = "overview"; renderActive(); }
   });
 }
-  return { initCodesPage, initPlaygroundPage };
+const COMMON_PATHS = [
+  {
+    title: "forecast: 発表時刻（reportDatetime）",
+    active: "forecast",
+    ptr: "/0/reportDatetime",
+    note: "配列0件目に入っていることが多い",
+  },
+  {
+    title: "forecast: timeSeries（全体）",
+    active: "forecast",
+    ptr: "/0/timeSeries",
+    note: "天気/降水確率/気温などのまとまり",
+  },
+  {
+    title: "forecast: 1つ目のtimeSeries",
+    active: "forecast",
+    ptr: "/0/timeSeries/0",
+    note: "areas配下に対象エリア別の値",
+  },
+  {
+    title: "forecast: 1つ目のtimeSeriesのareas",
+    active: "forecast",
+    ptr: "/0/timeSeries/0/areas",
+    note: "エリア別の値（weathers/pops/temps等）",
+  },
+  {
+    title: "overview: 発表時刻（reportDatetime）",
+    active: "overview",
+    ptr: "/reportDatetime",
+    note: "overviewは配列ではなくオブジェクトのことが多い",
+  },
+  {
+    title: "overview: 概況本文（text）",
+    active: "overview",
+    ptr: "/text",
+    note: "天気概況の文章",
+  },
+];
+
+function initPathsPage() {
+  const codeEl = document.getElementById("code");
+  const useEl = document.getElementById("use");
+  const listEl = document.getElementById("list");
+
+  // 初期値
+  codeEl.value = "2920900";
+
+  function render(code) {
+    const safeCode = encodeURIComponent(code || "");
+    listEl.innerHTML = "";
+
+    for (const p of COMMON_PATHS) {
+      const div = document.createElement("div");
+      div.className = "item";
+      div.style.borderBottom = "1px solid #eee";
+
+      // Playgroundに渡す：code, active, ptr
+      const href = `./playground.html?code=${safeCode}&active=${encodeURIComponent(p.active)}&ptr=${encodeURIComponent(p.ptr)}`;
+
+      div.innerHTML = `
+        <div><a href="${href}">${escapeHtml(p.title)}</a></div>
+        <small>pointer: <code>${escapeHtml(p.ptr)}</code> / ${escapeHtml(p.note)}</small>
+      `;
+      listEl.appendChild(div);
+    }
+  }
+
+  useEl.onclick = () => render(codeEl.value.trim());
+  render(codeEl.value.trim());
+}
+  return { initCodesPage, initPlaygroundPage, initPathsPage };
 })();
