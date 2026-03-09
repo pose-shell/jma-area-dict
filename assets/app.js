@@ -363,9 +363,20 @@ async function initPlaygroundPage() {
   };
 
   // クエリから初期値（?code=2920900 のように渡せるように）
-  const params = new URLSearchParams(location.search);
-  const qcode = params.get("code");
-  if (qcode) codeEl.value = qcode;
+const params = new URLSearchParams(location.search);
+const qcode = params.get("code");
+const qactive = params.get("active"); // forecast / overview
+const qptr = params.get("ptr");       // JSON Pointer
+
+if (qcode) codeEl.value = qcode;
+
+// ★active が正しい値のときだけ反映（事故防止）
+if (qactive === "forecast" || qactive === "overview") {
+  state.active = qactive;
+}
+
+// ★ptr はそのまま入力欄へ
+if (qptr) ptrEl.value = qptr;
 
   async function resolveOfficeFromAnyCode(inputCode) {
     // 6桁なら office とみなす（最小ルール）
@@ -402,6 +413,8 @@ async function initPlaygroundPage() {
 
       // ツリー（forecastを表示）
       renderActive();
+      // ★ptr が入っていれば自動で Selected 表示まで進める
+　　　if (ptrEl.value.trim()) jumpEl.click();
     } catch (e) {
       const msg = e?.stack || e?.message || String(e);
       treeEl.innerHTML = `<p>エラー</p><pre>${escapeHtml(msg)}</pre>`;
