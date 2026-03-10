@@ -135,49 +135,70 @@ window.JMA_DICT = (() => {
   }
 
   // ★安全化パッチ：renderDetail 全体を try/catch にして detail ペインにエラーを出す
-  function renderDetail(detailEl, it, byCode, parentMap) {
-    try {
-      // ★安全化パッチ：クリックが生きているかを即確認できる
-      detailEl.innerHTML = `<p>選択中: <code>${escapeHtml(it.code)}</code> ${escapeHtml(it.name)}</p>`;
+function renderDetail(detailEl, it, byCode, parentMap) {
+  try {
+    // ★安全化パッチ：クリックが生きているかを即確認できる
+    detailEl.innerHTML = `<p>選択中: <code>${escapeHtml(it.code)}</code> ${escapeHtml(it.name)}</p>`;
 
-      const raw = it.raw || {};
-      const parent = getParentCode(raw, it.code, parentMap);
+    const raw = it.raw || {};
+    const parent = getParentCode(raw, it.code, parentMap);
 
-      const r = resolveOfficeCode(it.code, byCode, parentMap);
-      const office = r.office;
-      const forecastUrl = office ? `https://www.jma.go.jp/bosai/forecast/data/forecast/${office}.json` : "";
-      const overviewUrl = office ? `https://www.jma.go.jp/bosai/forecast/data/overview_forecast/${office}.json` : "";
+    const r = resolveOfficeCode(it.code, byCode, parentMap);
+    const office = r.office;
 
-      detailEl.innerHTML = `
-        <h2><code>${it.code}</code> ${escapeHtml(it.name)}</h2>
-        <p><small>group: ${escapeHtml(it.group)}</small></p>
+    const forecastUrl = office
+      ? `https://www.jma.go.jp/bosai/forecast/data/forecast/${office}.json`
+      : "";
+    const overviewUrl = office
+      ? `https://www.jma.go.jp/bosai/forecast/data/overview_forecast/${office}.json`
+      : "";
 
-        <h3>office解決（予報取得用）</h3>
-        <p>office: ${office ? `<code>${escapeHtml(office)}</code>` : "<span>未解決</span>"}</p>
-        ${office ? `
-          <p>forecast: <code>${escapeHtml(forecastUrl)}</code></p>
-          <p>overview: <code>${escapeHtml(overviewUrl)}</code></p>
-          <p><a href="./playground.html?code=${encodeURIComponent(office)}">Playgroundで開く（office）</a></p>
-          <p><a href="./playground.html?code=${encodeURIComponent(it.code)}">Playgroundで開く（このコード）</a></p>
-        ` : `
-          <p><small>親を辿ってofficesに到達できませんでした（reason: ${escapeHtml(r.reason)}）</small></p>
-        `}
-        <p><small>探索経路: ${r.path.map(c => `<code>${escapeHtml(c)}</code>`).join(" ")}</small></p>
+    // 学習導線リンク（市町村コード/office/paths）
+    const pgCity = `./playground.html?code=${encodeURIComponent(it.code)}`;
+    const pgOffice = office ? `./playground.html?code=${encodeURIComponent(office)}` : "";
+    const pathsLink = `./paths.html?code=${encodeURIComponent(it.code)}`;
 
-        <h3>階層</h3>
-        <p>parent: ${parent ? `<code>${escapeHtml(String(parent))}</code>` : "-"}</p>
+    detailEl.innerHTML = `
+      <h2><code>${it.code}</code> ${escapeHtml(it.name)}</h2>
+      <p><small>group: ${escapeHtml(it.group)}</small></p>
 
-        <h3>raw</h3>
-        <pre>${escapeHtml(JSON.stringify(raw, null, 2))}</pre>
-      `;
-    } catch (e) {
-      console.error(e);
-      detailEl.innerHTML = `
-        <h3>detail表示でエラー</h3>
-        <pre>${escapeHtml(e?.stack || e?.message || String(e))}</pre>
-      `;
-    }
+      <h3>office解決（予報取得用）</h3>
+      <p>office: ${office ? `<code>${escapeHtml(office)}</code>` : "<span>未解決</span>"}</p>
+      ${office ? `
+        <p>forecast: <code>${escapeHtml(forecastUrl)}</code></p>
+        <p>overview: <code>${escapeHtml(overviewUrl)}</code></p>
+
+        <h3>学習導線</h3>
+        <ul>
+          <li><a href="${pgCity}">Playgroundで開く（この市町村コード）</a></li>
+          <li><a href="${pgOffice}">Playgroundで開く（解決したofficeコード）</a></li>
+          <li><a href="${pathsLink}">Paths（よく使うpointer集）をこのコードで開く</a></li>
+        </ul>
+      ` : `
+        <p><small>親を辿ってofficesに到達できませんでした（reason: ${escapeHtml(r.reason)}）</small></p>
+
+        <h3>学習導線</h3>
+        <ul>
+          <li><a href="${pgCity}">Playgroundで開く（このコード）</a></li>
+          <li><a href="${pathsLink}">Paths（よく使うpointer集）をこのコードで開く</a></li>
+        </ul>
+      `}
+      <p><small>探索経路: ${r.path.map(c => `<code>${escapeHtml(c)}</code>`).join(" ")}</small></p>
+
+      <h3>階層</h3>
+      <p>parent: ${parent ? `<code>${escapeHtml(String(parent))}</code>` : "-"}</p>
+
+      <h3>raw</h3>
+      <pre>${escapeHtml(JSON.stringify(raw, null, 2))}</pre>
+    `;
+  } catch (e) {
+    console.error(e);
+    detailEl.innerHTML = `
+      <h3>detail表示でエラー</h3>
+      <pre>${escapeHtml(e?.stack || e?.message || String(e))}</pre>
+    `;
   }
+}
 
   function escapeHtml(s) {
     return String(s)
@@ -534,8 +555,11 @@ function initPathsPage() {
   const useEl = document.getElementById("use");
   const listEl = document.getElementById("list");
 
-  // 初期値
-  codeEl.value = "2920900";
+  // 初期値（?code= があればそれを優先）
+  const params = new URLSearchParams(location.search);
+  const qcode = params.get("code");
+  if (qcode) codeEl.value = qcode;
+  else codeEl.value = "2920900";
 
   function render(code) {
     const safeCode = encodeURIComponent(code || "");
