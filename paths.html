@@ -7,14 +7,7 @@
   <link rel="stylesheet" href="./assets/style.css" />
 </head>
 <body>
-  <header>
-    <strong>JMA Area Dict</strong>
-    <a href="./index.html">Home</a>
-    <a href="./codes.html">Codes</a>
-    <a href="./playground.html">Playground</a>
-    <a href="./paths.html">Paths</a>
-    <a href="./notes.html">Notes</a>
-  </header>
+  <header></header>
 
   <h1>よく使うJSON Pointer（forecast / overview）</h1>
   <p><small>このページのボタンを押すと Playground を開き、pointer を自動セットします。</small></p>
@@ -28,6 +21,7 @@
 
   <script src="./assets/app.js"></script>
   <script>
+    window.JMA_DICT.renderNav("paths");
     window.JMA_DICT.initPathsPage();
   </script>
 </body>
