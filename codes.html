@@ -7,14 +7,7 @@
   <link rel="stylesheet" href="./assets/style.css" />
 </head>
 <body>
-  <header>
-    <strong>JMA Area Dict</strong>
-    <a href="./index.html">Home</a>
-    <a href="./codes.html">Codes</a>
-    <a href="./playground.html">Playground</a>
-    <a href="./paths.html">paths</a>
-    <a href="./notes.html">Notes</a>
-  </header>
+  <header></header>
 
   <h1>地域コード辞書</h1>
   <p><small>出典：気象庁ホームページ（area.json）</small></p>
@@ -30,6 +23,7 @@
 
   <script src="./assets/app.js"></script>
   <script>
+    window.JMA_DICT.renderNav("codes");
     window.JMA_DICT.initCodesPage();
   </script>
 </body>
