@@ -560,5 +560,17 @@ function initPathsPage() {
   useEl.onclick = () => render(codeEl.value.trim());
   render(codeEl.value.trim());
 }
-  return { initCodesPage, initPlaygroundPage, initPathsPage };
+function renderNav(active) {
+  const h = document.querySelector("header");
+  if (!h) return;
+  h.innerHTML = `
+    <strong>JMA Area Dict</strong>
+    <a href="./index.html"${active==="home"?" style='font-weight:700'":""}>Home</a>
+    <a href="./codes.html"${active==="codes"?" style='font-weight:700'":""}>Codes</a>
+    <a href="./playground.html"${active==="playground"?" style='font-weight:700'":""}>Playground</a>
+    <a href="./paths.html"${active==="paths"?" style='font-weight:700'":""}>Paths</a>
+    <a href="./notes.html"${active==="notes"?" style='font-weight:700'":""}>Notes</a>
+  `;
+}  
+  return { initCodesPage, initPlaygroundPage, initPathsPage, renderNav};
 })();
