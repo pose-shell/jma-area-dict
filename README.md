@@ -28,7 +28,7 @@
 
 ## 公開URL（GitHub Pages）
 
-- Site: （ここにあなたの Pages URL を貼る）
+- Site: https://pose-shell.github.io/jma-area-dict/
 
 ## 技術
 
